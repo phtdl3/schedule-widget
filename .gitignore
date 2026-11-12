@@ -13,3 +13,13 @@ __pycache__/
 # Редакторы
 .idea/
 .vscode/
+
+# Android / Gradle
+/android/.gradle/
+/android/.kotlin/
+/android/local.properties
+/android/**/build/
+*.apk
+*.aab
+*.jks
+*.keystore
