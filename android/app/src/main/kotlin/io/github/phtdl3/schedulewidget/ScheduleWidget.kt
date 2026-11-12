@@ -10,14 +10,14 @@ import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.action.actionStartActivity
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
-import androidx.glance.appwidget.lazy.LazyColumn
-import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
@@ -53,6 +53,9 @@ class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 class ScheduleWidget : GlanceAppWidget() {
+    // Точный размер нужен, чтобы посчитать, сколько строк списка помещается.
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = ScheduleRepository.get(context)
         repository.ensureLoaded()
@@ -106,6 +109,15 @@ private fun style(color: ColorProvider, size: Int = 13, bold: Boolean = false) =
     fontWeight = if (bold) FontWeight.Medium else FontWeight.Normal,
 )
 
+/** Примерная высота всего, что выше списка, вместе с отступами виджета. */
+private const val HEADER_HEIGHT_DP = 150f
+
+/** Примерная высота одной строки списка. */
+private const val ROW_HEIGHT_DP = 34f
+
+/** Glance не разрешает больше 10 элементов в одном столбце. */
+private const val MAX_ROWS = 10
+
 @Composable
 private fun WidgetContent(overview: DayOverview?) {
     Column(
@@ -123,7 +135,9 @@ private fun WidgetContent(overview: DayOverview?) {
             Text("Нажмите, чтобы открыть приложение и загрузить его", style = style(Palette.secondary))
             return@Column
         }
-        NextLesson(overview)
+        // Glance молча отбрасывает всё после 10-го элемента в одном столбце,
+        // поэтому верхний блок и список живут в собственных вложенных столбцах.
+        Column(GlanceModifier.fillMaxWidth()) { NextLesson(overview) }
         Spacer(GlanceModifier.height(12.dp))
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(Palette.divider)) {}
         Spacer(GlanceModifier.height(8.dp))
@@ -140,8 +154,11 @@ private fun WidgetContent(overview: DayOverview?) {
                 modifier = GlanceModifier.padding(horizontal = 8.dp),
             )
         } else {
-            LazyColumn {
-                items(overview.today, itemId = { it.id }) { lesson ->
+            // Обычные строки вместо прокручиваемого списка: виджет сам оставляет
+            // актуальные пары, если все не помещаются, и прокручивать его не нужно.
+            val capacity = ((LocalSize.current.height.value - HEADER_HEIGHT_DP) / ROW_HEIGHT_DP).toInt()
+            Column(GlanceModifier.fillMaxWidth()) {
+                overview.visibleToday(capacity.coerceIn(1, MAX_ROWS)).forEach { lesson ->
                     LessonRow(lesson, overview)
                 }
             }

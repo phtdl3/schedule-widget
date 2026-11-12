@@ -17,6 +17,20 @@ data class DayOverview(
 ) {
     val nextStartsIn: Duration? get() = next?.let { Duration.between(now, it.startsAt) }
     val currentEndsIn: Duration? get() = current?.let { Duration.between(now, it.endsAt) }
+
+    /**
+     * Пары на сегодня, которые стоит показать, если помещается только [capacity] строк.
+     * Первыми отбрасываются уже прошедшие пары; если не помещаются и оставшиеся,
+     * показываются ближайшие.
+     */
+    fun visibleToday(capacity: Int): List<Lesson> {
+        if (capacity <= 0) return emptyList()
+        if (today.size <= capacity) return today
+        val firstUnfinished = today.indexOfFirst { it.endsAt.isAfter(now) }
+            .let { if (it < 0) today.size else it }
+        val start = minOf(firstUnfinished, today.size - capacity)
+        return today.subList(start, start + capacity)
+    }
 }
 
 /**

@@ -156,6 +156,40 @@ class ScheduleTest {
         assertEquals(Duration.ofMinutes(85), overview.nextStartsIn)
     }
 
+    // --- Сколько пар показывать, если не помещаются все ---
+
+    @Test
+    fun showsWholeDayWhenItFits() {
+        val overview = schedule.overview(moscow(13, 13, 5), subgroup = 1)
+        assertEquals(overview.today, overview.visibleToday(capacity = 4))
+        assertEquals(overview.today, overview.visibleToday(capacity = 10))
+    }
+
+    @Test
+    fun dropsFinishedLessonsFirst() {
+        // 13:05, подгруппа 1: пара 10:25 прошла, 12:45 идёт, впереди 14:30 и 16:15.
+        val overview = schedule.overview(moscow(13, 13, 5), subgroup = 1)
+        assertEquals(
+            listOf("12:45", "14:30", "16:15"),
+            overview.visibleToday(capacity = 3).map { it.start.toString() },
+        )
+        // Не помещаются даже оставшиеся: показываем ближайшие.
+        assertEquals(
+            listOf("12:45", "14:30"),
+            overview.visibleToday(capacity = 2).map { it.start.toString() },
+        )
+    }
+
+    @Test
+    fun showsLastLessonsWhenDayIsOver() {
+        val overview = schedule.overview(moscow(13, 20, 0), subgroup = 1)
+        assertEquals(
+            listOf("14:30", "16:15"),
+            overview.visibleToday(capacity = 2).map { it.start.toString() },
+        )
+        assertEquals(emptyList(), overview.visibleToday(capacity = 0))
+    }
+
     // --- Подписи ---
 
     @Test
