@@ -1,0 +1,64 @@
+name: Update schedule
+
+on:
+  schedule:
+    # 06:17 и 19:17 по Москве. Утром — свежий файл к началу пар; вечером — потому что
+    # вуз выгружает расписание около 18:00. Минуты не круглые: в :00 и :30 очередь
+    # GitHub перегружена, и запуски по расписанию сильно опаздывают.
+    - cron: "17 3 * * *"
+    - cron: "17 16 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "parser/**"
+      - ".github/workflows/update-schedule.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run parser tests
+        run: python3 -m unittest discover -s parser/tests
+
+      # Если сайт вуза недоступен или вернул мусор, шаг падает, публикация не
+      # запускается, и на GitHub Pages остаётся предыдущий schedule.json.
+      - name: Build schedule.json
+        run: python3 parser/build_schedule.py --out public/schedule.json
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: public
+
+      # GitHub отключает запуски по расписанию в репозиториях без активности 60 дней.
+      # Повторное включение workflow через API сбрасывает этот счётчик.
+      - name: Keep the schedule trigger alive
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-schedule.yml/enable"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
