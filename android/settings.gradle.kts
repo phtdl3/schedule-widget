@@ -18,3 +18,6 @@ rootProject.name = "ScheduleWidget"
 
 // core — чистый Kotlin без Android: разбор schedule.json и логика "что сейчас, что дальше".
 include(":core")
+
+// app — само Android-приложение: загрузка и кэш расписания, виджет, экран настроек.
+include(":app")
