@@ -8,7 +8,7 @@ Android-виджет с расписанием группы 26о-090303-ПИ/1 (
 | Этап | Статус |
 | --- | --- |
 | 1. Парсер расписания в `schedule.json` | готов |
-| 2. Автообновление через GitHub Actions и GitHub Pages | workflow написан, репозиторий на GitHub ещё не создан |
+| 2. Автообновление через GitHub Actions и GitHub Pages | работает: [schedule.json](https://phtdl3.github.io/schedule-widget/schedule.json) |
 | 3. Android-виджет (Kotlin, Jetpack Glance) | не начат |
 | 4. Уведомление за 10 минут до пары, пометка изменённых пар | не начат |
 
