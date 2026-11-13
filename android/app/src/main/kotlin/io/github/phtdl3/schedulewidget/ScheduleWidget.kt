@@ -8,14 +8,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.action.actionStartActivity
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -31,6 +37,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -95,6 +102,19 @@ class ScheduleWidget : GlanceAppWidget() {
 }
 
 /**
+ * Нажатие на кнопку обновления в виджете: сразу перерисовать его с текущим временем,
+ * заново завести минутные обновления и скачать свежее расписание.
+ */
+class RefreshAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        WidgetTicker.scheduleNext(context)
+        ScheduleWidget.refreshAll(context)
+        // Сеть — отдельной задачей: обработчик нажатия должен завершиться за несколько секунд.
+        RefreshWorker.runNow(context)
+    }
+}
+
+/**
  * Время, по которому нарисован виджет.
  *
  * Glance держит содержимое виджета «живым» около 45 секунд после обновления и в это
@@ -150,7 +170,7 @@ private fun style(color: ColorProvider, size: Int = 13, bold: Boolean = false) =
 )
 
 /** Примерная высота всего, что выше списка, вместе с отступами виджета. */
-private const val HEADER_HEIGHT_DP = 150f
+private const val HEADER_HEIGHT_DP = 160f
 
 /** Примерная высота одной строки списка. */
 private const val ROW_HEIGHT_DP = 34f
@@ -166,13 +186,15 @@ private fun WidgetContent(overview: DayOverview?) {
             .appWidgetBackground()
             .background(Palette.background)
             .cornerRadius(24.dp)
-            .padding(16.dp)
+            // Сверху отступ меньше: первая строка выше остальных из-за кнопки обновления.
+            .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
             .clickable(actionStartActivity<MainActivity>()),
     ) {
         if (overview == null) {
+            HeaderRow("Расписание", "")
             Text("Расписание ещё не загружено", style = style(Palette.primary, 16, bold = true))
             Spacer(GlanceModifier.height(4.dp))
-            Text("Нажмите, чтобы открыть приложение и загрузить его", style = style(Palette.secondary))
+            Text("Нажмите на стрелку, чтобы загрузить его", style = style(Palette.secondary))
             return@Column
         }
         // Glance молча отбрасывает всё после 10-го элемента в одном столбце,
@@ -206,18 +228,34 @@ private fun WidgetContent(overview: DayOverview?) {
     }
 }
 
+/** Первая строка виджета: подпись слева, отсчёт и кнопка обновления справа. */
+@Composable
+private fun HeaderRow(label: String, trailing: String) {
+    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = style(Palette.secondary, 12), modifier = GlanceModifier.defaultWeight())
+        Text(trailing, style = style(Palette.primary, bold = true))
+        // Область нажатия 36dp, сам значок 20dp и прижат к правому краю.
+        Box(
+            modifier = GlanceModifier
+                .size(36.dp)
+                .cornerRadius(18.dp)
+                .clickable(actionRunCallback<RefreshAction>()),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.ic_refresh),
+                contentDescription = "Обновить",
+                modifier = GlanceModifier.size(20.dp),
+                colorFilter = ColorFilter.tint(Palette.secondary),
+            )
+        }
+    }
+}
+
 @Composable
 private fun NextLesson(overview: DayOverview) {
     val next = overview.next
-    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            "Следующая пара",
-            style = style(Palette.secondary, 12),
-            modifier = GlanceModifier.defaultWeight(),
-        )
-        Text(ScheduleText.nextStart(overview) ?: "", style = style(Palette.primary, bold = true))
-    }
-    Spacer(GlanceModifier.height(4.dp))
+    HeaderRow("Следующая пара", ScheduleText.nextStart(overview) ?: "")
     if (next == null) {
         Text("В расписании больше нет пар", style = style(Palette.primary, 16, bold = true))
         return
