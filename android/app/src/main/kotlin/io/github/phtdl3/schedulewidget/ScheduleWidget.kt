@@ -1,5 +1,6 @@
 package io.github.phtdl3.schedulewidget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -7,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
@@ -19,9 +19,9 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
-import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -41,6 +41,8 @@ import io.github.phtdl3.schedule.Lesson
 import io.github.phtdl3.schedule.LessonType
 import io.github.phtdl3.schedule.ScheduleText
 import io.github.phtdl3.schedule.overview
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
 
 class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -49,6 +51,20 @@ class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         RefreshWorker.schedule(context)
+        WidgetTicker.scheduleNext(context)
+    }
+
+    // Система вызывает это при добавлении виджета и затем раз в 30 минут. Заодно
+    // перезапускаем минутные обновления, если их цепочка по какой-то причине оборвалась.
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        WidgetClock.tick()
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        WidgetTicker.scheduleNext(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetTicker.cancel(context)
     }
 }
 
@@ -60,13 +76,37 @@ class ScheduleWidget : GlanceAppWidget() {
         val repository = ScheduleRepository.get(context)
         repository.ensureLoaded()
 
+        WidgetClock.tick()
+
         provideContent {
-            // Чтение состояния подписывает виджет на update(): при каждом обновлении
-            // содержимое пересчитывается заново с текущим временем.
-            currentState<Preferences>()
             val schedule by repository.schedule.collectAsState()
-            WidgetContent(schedule?.overview(Instant.now(), SUBGROUP))
+            val now by WidgetClock.now.collectAsState()
+            WidgetContent(schedule?.overview(now, SUBGROUP))
         }
+    }
+
+    companion object {
+        /** Перерисовать все виджеты с текущим временем. */
+        suspend fun refreshAll(context: Context) {
+            WidgetClock.tick()
+            ScheduleWidget().updateAll(context)
+        }
+    }
+}
+
+/**
+ * Время, по которому нарисован виджет.
+ *
+ * Glance держит содержимое виджета «живым» около 45 секунд после обновления и в это
+ * время на update() отдаёт прежнюю картинку, если не изменилось ни одно состояние,
+ * которое она читает. Поэтому время — явное состояние: его смена сама вызывает перерисовку.
+ */
+object WidgetClock {
+    private val _now = MutableStateFlow(Instant.now())
+    val now: StateFlow<Instant> = _now
+
+    fun tick() {
+        _now.value = Instant.now()
     }
 }
 

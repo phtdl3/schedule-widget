@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.updateAll
 import io.github.phtdl3.schedule.ScheduleText
 import io.github.phtdl3.schedule.overview
 import kotlinx.coroutines.launch
@@ -39,6 +38,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         RefreshWorker.schedule(this)
+        WidgetTicker.scheduleNext(this)
         setContent {
             val context = LocalContext.current
             val colors = if (isSystemInDarkTheme()) {
@@ -72,7 +72,7 @@ private fun StatusScreen() {
             ScheduleRepository.RefreshResult.Updated -> "Расписание обновлено"
             is ScheduleRepository.RefreshResult.Failed -> "Не удалось обновить: ${result.reason}"
         }
-        ScheduleWidget().updateAll(context)
+        ScheduleWidget.refreshAll(context)
         busy = false
     }
 

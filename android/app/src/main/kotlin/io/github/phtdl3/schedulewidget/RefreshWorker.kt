@@ -1,7 +1,6 @@
 package io.github.phtdl3.schedulewidget
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -17,7 +16,7 @@ class RefreshWorker(context: Context, parameters: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         val result = ScheduleRepository.get(applicationContext).refresh()
-        ScheduleWidget().updateAll(applicationContext)
+        ScheduleWidget.refreshAll(applicationContext)
         return when (result) {
             ScheduleRepository.RefreshResult.Updated -> Result.success()
             is ScheduleRepository.RefreshResult.Failed -> Result.retry()
