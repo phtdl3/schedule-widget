@@ -114,6 +114,10 @@ private object TrainColors {
     val secondary = pair(0xFF444441, 0xFFD3D1C7)
     val muted = pair(0xFF888780, 0xFF888780)
     val track = pair(0xFFF1EFE8, 0xFF444441)
+
+    // Выбранная половина переключателя — контрастная заливка, чтобы выбор читался сразу.
+    val selected = pair(0xFF2C2C2A, 0xFFF1EFE8)
+    val onSelected = pair(0xFFFFFFFF, 0xFF2C2C2A)
     val divider = pair(0xFFD3D1C7, 0xFF5F5E5A)
 
     fun stationFill(station: Station) = when (station) {
@@ -149,13 +153,13 @@ private fun style(color: ColorProvider, size: Int = 13, bold: Boolean = false) =
 )
 
 /** Ширина плашки станции: одинаковая у всех, чтобы строки были симметричны. */
-private val CHIP_WIDTH = 76.dp
+private val CHIP_WIDTH = 70.dp
 
 /** Примерная высота всего, что выше списка, вместе с отступами виджета. */
-private const val HEADER_HEIGHT_DP = 142f
+private const val HEADER_HEIGHT_DP = 134f
 
 /** Примерная высота одной строки списка. */
-private const val ROW_HEIGHT_DP = 32f
+private const val ROW_HEIGHT_DP = 30f
 
 /** Glance не разрешает больше 10 элементов в одном столбце. */
 private const val MAX_ROWS = 10
@@ -168,11 +172,11 @@ private fun TrainsContent(timetable: TrainTimetable?, direction: Direction, now:
             .appWidgetBackground()
             .background(TrainColors.background)
             .cornerRadius(24.dp)
-            .padding(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 14.dp)
+            .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp)
             .clickable(actionStartActivity<MainActivity>()),
     ) {
         TopBar(direction)
-        Spacer(GlanceModifier.height(6.dp))
+        Spacer(GlanceModifier.height(4.dp))
 
         if (timetable == null) {
             Message("Электрички ещё не загружены", "Нажмите на стрелку, чтобы загрузить расписание")
@@ -187,9 +191,9 @@ private fun TrainsContent(timetable: TrainTimetable?, direction: Direction, now:
         }
 
         NextTrain(next, now)
-        Spacer(GlanceModifier.height(10.dp))
+        Spacer(GlanceModifier.height(8.dp))
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(TrainColors.divider)) {}
-        Spacer(GlanceModifier.height(6.dp))
+        Spacer(GlanceModifier.height(5.dp))
         Column(GlanceModifier.fillMaxWidth()) {
             trains.drop(1).forEach { train -> TrainRow(train) }
         }
@@ -212,17 +216,19 @@ private fun TopBar(direction: Direction) {
         Row(GlanceModifier.background(TrainColors.track).cornerRadius(14.dp).padding(2.dp)) {
             listOf(Direction.TO_MOSCOW, Direction.FROM_MOSCOW).forEach { option ->
                 val selected = option == direction
-                var modifier = GlanceModifier
+                // Фон задан явно у обеих половин: без него невыбранная половина
+                // на телефоне рисуется так же, как выбранная.
+                val modifier = GlanceModifier
+                    .background(if (selected) TrainColors.selected else TrainColors.track)
                     .cornerRadius(12.dp)
                     .padding(horizontal = 10.dp, vertical = 4.dp)
                     .clickable(
                         actionRunCallback<SetDirectionAction>(actionParametersOf(directionKey to option.name)),
                     )
-                if (selected) modifier = modifier.background(TrainColors.background)
                 Box(modifier) {
                     Text(
                         TrainText.directionLabel(option),
-                        style = style(if (selected) TrainColors.primary else TrainColors.secondary, 12, bold = selected),
+                        style = style(if (selected) TrainColors.onSelected else TrainColors.secondary, 12, bold = selected),
                     )
                 }
             }
@@ -268,17 +274,17 @@ private fun Times(train: Train, big: Boolean) {
     Row(verticalAlignment = Alignment.Bottom) {
         Text(
             train.departureTime.toString(),
-            style = style(TrainColors.primary, if (big) 28 else 18, bold = true),
+            style = style(TrainColors.primary, if (big) 26 else 18, bold = true),
             maxLines = 1,
         )
-        Spacer(GlanceModifier.width(7.dp))
+        Spacer(GlanceModifier.width(6.dp))
         Text(
             TrainText.travelTime(train),
             style = style(TrainColors.muted, 11),
             modifier = GlanceModifier.padding(bottom = if (big) 5.dp else 2.dp),
             maxLines = 1,
         )
-        Spacer(GlanceModifier.width(7.dp))
+        Spacer(GlanceModifier.width(6.dp))
         Text(
             train.arrivalTime.toString(),
             style = style(TrainColors.secondary, if (big) 17 else 14),
@@ -318,7 +324,7 @@ private fun NextTrain(train: Train, now: Instant) {
 @Composable
 private fun TrainRow(train: Train) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StationChip(train.from)
