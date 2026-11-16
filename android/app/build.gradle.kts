@@ -1,6 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Ключ API Яндекс Расписаний лежит в local.properties (строка yandexRaspKey=...),
+// этот файл не хранится в git. Без ключа приложение собирается, но электрички не грузит.
+val yandexRaspKey: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("yandexRaspKey", "").trim()
+
+require(yandexRaspKey.all { it.isLetterOrDigit() || it == '-' }) {
+    "yandexRaspKey в local.properties должен состоять из букв, цифр и дефисов"
 }
 
 android {
@@ -15,6 +28,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1"
+
+        buildConfigField("String", "YANDEX_RASP_KEY", "\"$yandexRaspKey\"")
     }
 
     compileOptions {
@@ -24,6 +39,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

@@ -3,4 +3,6 @@
     <string name="app_name">Расписание</string>
     <string name="widget_name">Расписание пар</string>
     <string name="widget_description">Следующая пара и список пар на сегодня</string>
+    <string name="trains_widget_name">Электрички</string>
+    <string name="trains_widget_description">Ближайшие электрички между Горенками и Москвой</string>
 </resources>

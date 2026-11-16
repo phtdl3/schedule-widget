@@ -25,7 +25,7 @@ class RefreshWorker(context: Context, parameters: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         val result = ScheduleRepository.get(applicationContext).refresh()
-        ScheduleWidget.refreshAll(applicationContext)
+        Widgets.refreshAll(applicationContext)
 
         if (inputData.getBoolean(KEY_MANUAL, false)) {
             // Запуск кнопкой: сообщаем, чем закончилось, и сами попытку не повторяем.

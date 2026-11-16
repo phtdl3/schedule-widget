@@ -25,7 +25,6 @@ import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
@@ -69,10 +68,6 @@ class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
         WidgetTicker.scheduleNext(context)
     }
 
-    override fun onDisabled(context: Context) {
-        super.onDisabled(context)
-        WidgetTicker.cancel(context)
-    }
 }
 
 class ScheduleWidget : GlanceAppWidget() {
@@ -92,13 +87,6 @@ class ScheduleWidget : GlanceAppWidget() {
         }
     }
 
-    companion object {
-        /** Перерисовать все виджеты с текущим временем. */
-        suspend fun refreshAll(context: Context) {
-            WidgetClock.tick()
-            ScheduleWidget().updateAll(context)
-        }
-    }
 }
 
 /**
@@ -108,7 +96,7 @@ class ScheduleWidget : GlanceAppWidget() {
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         WidgetTicker.scheduleNext(context)
-        ScheduleWidget.refreshAll(context)
+        Widgets.refreshAll(context)
         // Сеть — отдельной задачей: обработчик нажатия должен завершиться за несколько секунд.
         RefreshWorker.runNow(context)
     }

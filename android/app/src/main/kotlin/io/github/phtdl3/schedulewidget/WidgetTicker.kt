@@ -5,13 +5,12 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.glance.appwidget.GlanceAppWidgetManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Перерисовывает виджет в начале каждой минуты, чтобы отсчёт до пары не отставал.
+ * Перерисовывает виджеты в начале каждой минуты, чтобы отсчёт до пары и электрички не отставал.
  *
  * Будильник одноразовый и каждый раз заводится заново на следующую минуту: повторяющиеся
  * будильники Android срабатывают неточно. Тип RTC (без WAKEUP) не будит спящий телефон:
@@ -39,10 +38,6 @@ object WidgetTicker {
             alarms.set(AlarmManager.RTC, nextMinute, pendingIntent(context))
         }
     }
-
-    fun cancel(context: Context) {
-        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context))
-    }
 }
 
 /**
@@ -54,13 +49,10 @@ class TickReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val hasWidgets = GlanceAppWidgetManager(context)
-                    .getGlanceIds(ScheduleWidget::class.java)
-                    .isNotEmpty()
-                // Виджет убрали с экрана — цепочка будильников обрывается.
-                if (hasWidgets) {
+                // Все виджеты убрали с экрана — цепочка будильников обрывается сама.
+                if (Widgets.anyPlaced(context)) {
                     WidgetTicker.scheduleNext(context)
-                    ScheduleWidget.refreshAll(context)
+                    Widgets.refreshAll(context)
                 }
             } finally {
                 pending.finish()
