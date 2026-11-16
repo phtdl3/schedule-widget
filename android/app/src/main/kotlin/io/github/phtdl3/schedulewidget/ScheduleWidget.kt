@@ -166,6 +166,13 @@ private const val ROW_HEIGHT_DP = 34f
 /** Glance не разрешает больше 10 элементов в одном столбце. */
 private const val MAX_ROWS = 10
 
+/** Поле слева и справа от содержимого виджета. */
+private val SIDE_PADDING = 16.dp
+
+/** Область нажатия кнопки обновления; значок стоит в её центре. */
+private val REFRESH_BUTTON_SIZE = 36.dp
+private val REFRESH_ICON_SIZE = 20.dp
+
 @Composable
 private fun WidgetContent(overview: DayOverview?) {
     Column(
@@ -175,65 +182,80 @@ private fun WidgetContent(overview: DayOverview?) {
             .background(Palette.background)
             .cornerRadius(24.dp)
             // Сверху отступ меньше: первая строка выше остальных из-за кнопки обновления.
-            .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
+            // Правого поля у корня нет: его задаёт каждая строка сама, см. HeaderRow.
+            .padding(start = SIDE_PADDING, top = 8.dp, bottom = 16.dp)
             .clickable(actionStartActivity<MainActivity>()),
     ) {
         if (overview == null) {
             HeaderRow("Расписание", "")
-            Text("Расписание ещё не загружено", style = style(Palette.primary, 16, bold = true))
-            Spacer(GlanceModifier.height(4.dp))
-            Text("Нажмите на стрелку, чтобы загрузить его", style = style(Palette.secondary))
+            Column(GlanceModifier.fillMaxWidth().padding(end = SIDE_PADDING)) {
+                Text("Расписание ещё не загружено", style = style(Palette.primary, 16, bold = true))
+                Spacer(GlanceModifier.height(4.dp))
+                Text("Нажмите на стрелку, чтобы загрузить его", style = style(Palette.secondary))
+            }
             return@Column
         }
         // Glance молча отбрасывает всё после 10-го элемента в одном столбце,
         // поэтому верхний блок и список живут в собственных вложенных столбцах.
         Column(GlanceModifier.fillMaxWidth()) { NextLesson(overview) }
-        Spacer(GlanceModifier.height(12.dp))
-        Box(GlanceModifier.fillMaxWidth().height(1.dp).background(Palette.divider)) {}
-        Spacer(GlanceModifier.height(8.dp))
-        Text(
-            ScheduleText.todayTitle(overview.now.toLocalDate()),
-            style = style(Palette.secondary, 12),
-            modifier = GlanceModifier.padding(horizontal = 8.dp),
-        )
-        Spacer(GlanceModifier.height(4.dp))
-        if (overview.today.isEmpty()) {
+        Column(GlanceModifier.fillMaxWidth().padding(end = SIDE_PADDING)) {
+            Spacer(GlanceModifier.height(12.dp))
+            Box(GlanceModifier.fillMaxWidth().height(1.dp).background(Palette.divider)) {}
+            Spacer(GlanceModifier.height(8.dp))
             Text(
-                "Сегодня пар нет",
-                style = style(Palette.primary),
+                ScheduleText.todayTitle(overview.now.toLocalDate()),
+                style = style(Palette.secondary, 12),
                 modifier = GlanceModifier.padding(horizontal = 8.dp),
             )
-        } else {
-            // Обычные строки вместо прокручиваемого списка: виджет сам оставляет
-            // актуальные пары, если все не помещаются, и прокручивать его не нужно.
-            val capacity = ((LocalSize.current.height.value - HEADER_HEIGHT_DP) / ROW_HEIGHT_DP).toInt()
-            Column(GlanceModifier.fillMaxWidth()) {
-                overview.visibleToday(capacity.coerceIn(1, MAX_ROWS)).forEach { lesson ->
-                    LessonRow(lesson, overview)
+            Spacer(GlanceModifier.height(4.dp))
+            if (overview.today.isEmpty()) {
+                Text(
+                    "Сегодня пар нет",
+                    style = style(Palette.primary),
+                    modifier = GlanceModifier.padding(horizontal = 8.dp),
+                )
+            } else {
+                // Обычные строки вместо прокручиваемого списка: виджет сам оставляет
+                // актуальные пары, если все не помещаются, и прокручивать его не нужно.
+                val capacity = ((LocalSize.current.height.value - HEADER_HEIGHT_DP) / ROW_HEIGHT_DP).toInt()
+                Column(GlanceModifier.fillMaxWidth()) {
+                    overview.visibleToday(capacity.coerceIn(1, MAX_ROWS)).forEach { lesson ->
+                        LessonRow(lesson, overview)
+                    }
                 }
             }
         }
     }
 }
 
-/** Первая строка виджета: подпись слева, отсчёт и кнопка обновления справа. */
+/**
+ * Первая строка виджета: подпись слева, отсчёт и кнопка обновления справа.
+ *
+ * Значок стоит в центре области нажатия, иначе эффект нажатия рисуется со сдвигом.
+ * Чтобы значок при этом остался на линии правого поля, строка сама задаёт правый
+ * отступ, меньший обычного на половину разницы между областью нажатия и значком.
+ */
 @Composable
 private fun HeaderRow(label: String, trailing: String) {
-    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(end = SIDE_PADDING - (REFRESH_BUTTON_SIZE - REFRESH_ICON_SIZE) / 2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = style(Palette.secondary, 12), modifier = GlanceModifier.defaultWeight())
         Text(trailing, style = style(Palette.primary, bold = true))
-        // Область нажатия 36dp, сам значок 20dp и прижат к правому краю.
         Box(
             modifier = GlanceModifier
-                .size(36.dp)
-                .cornerRadius(18.dp)
+                .size(REFRESH_BUTTON_SIZE)
+                .cornerRadius(REFRESH_BUTTON_SIZE / 2)
                 .clickable(actionRunCallback<RefreshAction>()),
-            contentAlignment = Alignment.CenterEnd,
+            contentAlignment = Alignment.Center,
         ) {
             Image(
                 provider = ImageProvider(R.drawable.ic_refresh),
                 contentDescription = "Обновить",
-                modifier = GlanceModifier.size(20.dp),
+                modifier = GlanceModifier.size(REFRESH_ICON_SIZE),
                 colorFilter = ColorFilter.tint(Palette.secondary),
             )
         }
@@ -244,31 +266,33 @@ private fun HeaderRow(label: String, trailing: String) {
 private fun NextLesson(overview: DayOverview) {
     val next = overview.next
     HeaderRow("Следующая пара", ScheduleText.nextStart(overview) ?: "")
-    if (next == null) {
-        Text("В расписании больше нет пар", style = style(Palette.primary, 16, bold = true))
-        return
-    }
-    Text(next.subject, style = style(Palette.primary, 20, bold = true), maxLines = 2)
-    Spacer(GlanceModifier.height(4.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        val label = ScheduleText.typeFull(next.type)
-        val fill = Palette.fill(next.type)
-        if (label != null && fill != null) {
-            Box(
-                modifier = GlanceModifier
-                    .background(fill)
-                    .cornerRadius(6.dp)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            ) {
-                Text(label, style = style(Palette.text(next.type), 12, bold = true))
+    Column(GlanceModifier.fillMaxWidth().padding(end = SIDE_PADDING)) {
+        if (next == null) {
+            Text("В расписании больше нет пар", style = style(Palette.primary, 16, bold = true))
+        } else {
+            Text(next.subject, style = style(Palette.primary, 20, bold = true), maxLines = 2)
+            Spacer(GlanceModifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val label = ScheduleText.typeFull(next.type)
+                val fill = Palette.fill(next.type)
+                if (label != null && fill != null) {
+                    Box(
+                        modifier = GlanceModifier
+                            .background(fill)
+                            .cornerRadius(6.dp)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(label, style = style(Palette.text(next.type), 12, bold = true))
+                    }
+                    Spacer(GlanceModifier.width(8.dp))
+                }
+                Text(
+                    listOfNotNull(next.room, "${next.start}–${next.end}").joinToString(" · "),
+                    style = style(Palette.secondary),
+                    maxLines = 1,
+                )
             }
-            Spacer(GlanceModifier.width(8.dp))
         }
-        Text(
-            listOfNotNull(next.room, "${next.start}–${next.end}").joinToString(" · "),
-            style = style(Palette.secondary),
-            maxLines = 1,
-        )
     }
 }
 

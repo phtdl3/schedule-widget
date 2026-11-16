@@ -164,6 +164,13 @@ private const val ROW_HEIGHT_DP = 30f
 /** Glance не разрешает больше 10 элементов в одном столбце. */
 private const val MAX_ROWS = 10
 
+/** Поле слева и справа от содержимого виджета. */
+private val SIDE_PADDING = 12.dp
+
+/** Область нажатия кнопки обновления; значок стоит в её центре. */
+private val REFRESH_BUTTON_SIZE = 36.dp
+private val REFRESH_ICON_SIZE = 20.dp
+
 @Composable
 private fun TrainsContent(timetable: TrainTimetable?, direction: Direction, now: Instant) {
     Column(
@@ -172,31 +179,38 @@ private fun TrainsContent(timetable: TrainTimetable?, direction: Direction, now:
             .appWidgetBackground()
             .background(TrainColors.background)
             .cornerRadius(24.dp)
-            .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp)
+            // Правого поля у корня нет: его задаёт каждая строка сама, см. TopBar.
+            .padding(start = SIDE_PADDING, top = 6.dp, bottom = 10.dp)
             .clickable(actionStartActivity<MainActivity>()),
     ) {
         TopBar(direction)
-        Spacer(GlanceModifier.height(4.dp))
+        Column(GlanceModifier.fillMaxWidth().padding(end = SIDE_PADDING)) {
+            Spacer(GlanceModifier.height(4.dp))
+            TrainsBody(timetable, direction, now)
+        }
+    }
+}
 
-        if (timetable == null) {
-            Message("Электрички ещё не загружены", "Нажмите на стрелку, чтобы загрузить расписание")
-            return@Column
-        }
-        val capacity = ((LocalSize.current.height.value - HEADER_HEIGHT_DP) / ROW_HEIGHT_DP).toInt()
-        val trains = timetable.upcoming(direction, now, limit = 1 + capacity.coerceIn(0, MAX_ROWS))
-        val next = trains.firstOrNull()
-        if (next == null) {
-            Message("В сохранённом расписании больше нет электричек", "Нажмите на стрелку, чтобы обновить его")
-            return@Column
-        }
+@Composable
+private fun TrainsBody(timetable: TrainTimetable?, direction: Direction, now: Instant) {
+    if (timetable == null) {
+        Message("Электрички ещё не загружены", "Нажмите на стрелку, чтобы загрузить расписание")
+        return
+    }
+    val capacity = ((LocalSize.current.height.value - HEADER_HEIGHT_DP) / ROW_HEIGHT_DP).toInt()
+    val trains = timetable.upcoming(direction, now, limit = 1 + capacity.coerceIn(0, MAX_ROWS))
+    val next = trains.firstOrNull()
+    if (next == null) {
+        Message("В сохранённом расписании больше нет электричек", "Нажмите на стрелку, чтобы обновить его")
+        return
+    }
 
-        NextTrain(next, now)
-        Spacer(GlanceModifier.height(8.dp))
-        Box(GlanceModifier.fillMaxWidth().height(1.dp).background(TrainColors.divider)) {}
-        Spacer(GlanceModifier.height(5.dp))
-        Column(GlanceModifier.fillMaxWidth()) {
-            trains.drop(1).forEach { train -> TrainRow(train) }
-        }
+    NextTrain(next, now)
+    Spacer(GlanceModifier.height(8.dp))
+    Box(GlanceModifier.fillMaxWidth().height(1.dp).background(TrainColors.divider)) {}
+    Spacer(GlanceModifier.height(5.dp))
+    Column(GlanceModifier.fillMaxWidth()) {
+        trains.drop(1).forEach { train -> TrainRow(train) }
     }
 }
 
@@ -212,7 +226,14 @@ private fun Message(title: String, hint: String) {
 /** Переключатель направления слева, кнопка обновления справа. */
 @Composable
 private fun TopBar(direction: Direction) {
-    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // Значок обновления стоит в центре области нажатия, иначе эффект нажатия рисуется со
+    // сдвигом; правый отступ строки меньше обычного, чтобы значок остался на линии поля.
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(end = SIDE_PADDING - (REFRESH_BUTTON_SIZE - REFRESH_ICON_SIZE) / 2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Row(GlanceModifier.background(TrainColors.track).cornerRadius(14.dp).padding(2.dp)) {
             listOf(Direction.TO_MOSCOW, Direction.FROM_MOSCOW).forEach { option ->
                 val selected = option == direction
@@ -236,15 +257,15 @@ private fun TopBar(direction: Direction) {
         Spacer(GlanceModifier.defaultWeight())
         Box(
             modifier = GlanceModifier
-                .size(36.dp)
-                .cornerRadius(18.dp)
+                .size(REFRESH_BUTTON_SIZE)
+                .cornerRadius(REFRESH_BUTTON_SIZE / 2)
                 .clickable(actionRunCallback<RefreshTrainsAction>()),
-            contentAlignment = Alignment.CenterEnd,
+            contentAlignment = Alignment.Center,
         ) {
             Image(
                 provider = ImageProvider(R.drawable.ic_refresh),
                 contentDescription = "Обновить",
-                modifier = GlanceModifier.size(20.dp),
+                modifier = GlanceModifier.size(REFRESH_ICON_SIZE),
                 colorFilter = ColorFilter.tint(TrainColors.secondary),
             )
         }
